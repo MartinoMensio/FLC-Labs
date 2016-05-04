@@ -1,0 +1,15 @@
+A:\DIR\DIR2\FILE1.EXE
+E:\FILE1.BAT
+DIR1\DIR2\FILE2
+\UNIX\FILE.C
+A:README.TXT
+PIPPO
+prova\\n
+prova/sdf
+A:\safds\E:\dsf
+fdsf//ad
+a b c
+123*233
+http://www.polito.it
+/home
+\home

@@ -1,0 +1,276 @@
+<FONT COLOR="#FF0000">include &lt;time.h&gt;</FONT><BR>
+<BR>
+<FONT COLOR="#FF0000">include <FONT COLOR="#0000FF">"office.h"</FONT></FONT><BR>
+<BR>
+<FONT COLOR="#FF0000">define QUEUE_MAXDIM 100</FONT><BR>
+<BR>
+<FONT COLOR="#880088">//Buffer *my_urgent_Q, *my_answer_Q;</FONT><BR>
+<BR>
+void *studentFunction(void *param);<BR>
+void *officeFunction(void *param);<BR>
+void *officeSpecialFunction(void *param);<BR>
+<BR>
+<BR>
+<FONT COLOR="#008888">int</FONT> main(<FONT COLOR="#008888">int</FONT> argc, <FONT COLOR="#008888">char</FONT> **argv) {<BR>
+	time_t t;<BR>
+	<FONT COLOR="#008888">int</FONT> i;<BR>
+	pthread_t *th_s;<BR>
+	pthread_t *th_o = malloc(NUM_OFFICES * sizeof(pthread_t));<BR>
+	pthread_t th_special;<BR>
+	<BR>
+	<FONT COLOR="#880088">// check the number of parameters</FONT><BR>
+	<FONT COLOR="#888800">if</FONT> (argc &lt; 2) {<BR>
+		pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"Provide an integer parameter k!\n"</FONT>);<BR>
+		<FONT COLOR="#888800">return</FONT> -1;<BR>
+	}<BR>
+	k = atoi(argv[1]);<BR>
+	th_s = malloc(k * sizeof(pthread_t));<BR>
+	cond = cond_init(NUM_OFFICES);<BR>
+	<FONT COLOR="#880088">// init queues</FONT><BR>
+	normal_Q = B_init(QUEUE_MAXDIM);<BR>
+	special_Q = B_init(QUEUE_MAXDIM);<BR>
+	urgent_Q = malloc(NUM_OFFICES * sizeof(Buffer *));<BR>
+	answer_Q = malloc(k * sizeof(Buffer *));<BR>
+	<FONT COLOR="#888800">for</FONT>(i = 0; i &lt; k; i++) {<BR>
+		answer_Q[i] = B_init(QUEUE_MAXDIM);<BR>
+	}<BR>
+	<FONT COLOR="#888800">for</FONT>(i = 0; i &lt; NUM_OFFICES; i++) {<BR>
+		urgent_Q[i] = B_init(QUEUE_MAXDIM);<BR>
+	}<BR>
+	<BR>
+	setbuf(st<FONT COLOR="#888800">do</FONT>ut, 0);<BR>
+	srand((unsigned) time(&t));<BR>
+	<BR>
+	<FONT COLOR="#008888">int</FONT> *pi;<BR>
+	<FONT COLOR="#880088">// create k student threads</FONT><BR>
+	<FONT COLOR="#888800">for</FONT>(i = 0; i &lt;k; i++) {<BR>
+		pi = malloc(sizeof(<FONT COLOR="#008888">int</FONT>));<BR>
+		*pi = i;<BR>
+		pthread_create(&th_s[i], NULL, studentFunction, pi);<BR>
+	}<BR>
+	<BR>
+	<FONT COLOR="#880088">// create NUM_OFFICES office threads</FONT><BR>
+	<FONT COLOR="#888800">for</FONT>(i = 0; i &lt; NUM_OFFICES; i++) {<BR>
+		pi = malloc(sizeof(<FONT COLOR="#008888">int</FONT>));<BR>
+		*pi = i;<BR>
+		pthread_create(&th_o[i], NULL, officeFunction, pi);<BR>
+	}<BR>
+	<FONT COLOR="#880088">// create special office thread</FONT><BR>
+	pthread_create(&th_special, NULL, officeSpecialFunction, NULL);<BR>
+	<FONT COLOR="#880088">// exit only this thread</FONT><BR>
+	pthread_exit(0);<BR>
+	<FONT COLOR="#880088">// a return is needed (but will never be executed)</FONT><BR>
+	<FONT COLOR="#888800">return</FONT> 0;<BR>
+}<BR>
+<BR>
+void *studentFunction(void *param) {<BR>
+	<FONT COLOR="#008888">int</FONT> i = *(<FONT COLOR="#008888">int</FONT> *)param;<BR>
+	<FONT COLOR="#008888">int</FONT> office_number;<BR>
+	pthread_detach(pthread_self());<BR>
+	sleep(rand() % 10 + 1);<BR>
+	Info st_info, response;<BR>
+	st_info.id = i;<BR>
+	st_info.office_no = -1;<BR>
+	st_info.urgent = 0;<BR>
+	<FONT COLOR="#880088">// critical section</FONT><BR>
+	pthread_mutex_lock(&cond-&gt;lock);<BR>
+	send(normal_Q, st_info);<BR>
+	cond-&gt;normal++;<BR>
+	pthread_cond_broadcast(cond-&gt;cond);<BR>
+	pthread_mutex_unlock(&cond-&gt;lock);<BR>
+	<FONT COLOR="#880088">// end of critical section</FONT><BR>
+	<BR>
+	<FONT COLOR="#880088">// received from office message</FONT><BR>
+	response = receive(answer_Q[i]);<BR>
+	<FONT COLOR="#880088">// memorize the office number for future needs</FONT><BR>
+	office_number = response.office_no;<BR>
+	pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"student %d received answer from office %d\n"</FONT>, i, response.office_no);<BR>
+	<FONT COLOR="#880088">// end of service from office (can be final or special)</FONT><BR>
+	response = receive(answer_Q[i]);<BR>
+	<FONT COLOR="#888800">if</FONT> (response.office_no != -1) {<BR>
+		<FONT COLOR="#880088">// this is the end of the pain for this student, can go home</FONT><BR>
+		pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"student %d terminated after service at office %d\n"</FONT>, i, response.office_no);<BR>
+	} else {<BR>
+		<FONT COLOR="#880088">// student need to go to the special office</FONT><BR>
+		pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"student %d going from normal office to the special office\n"</FONT>, i);<BR>
+		<FONT COLOR="#880088">// add the student to the special queue</FONT><BR>
+		st_info.id = i;<BR>
+		st_info.office_no = office_number;<BR>
+		st_info.urgent = 0;<BR>
+		send(special_Q, st_info);<BR>
+		<FONT COLOR="#880088">// wait for a response from the special office</FONT><BR>
+		response = receive(answer_Q[i]);<BR>
+		pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"student %d served by the special office\n"</FONT>, i);<BR>
+		<FONT COLOR="#880088">// now need to go back to the previous office</FONT><BR>
+		pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"student %d going back to office %d\n"</FONT>, i, office_number);<BR>
+		st_info.id = i;<BR>
+		st_info.office_no = office_number;<BR>
+		st_info.urgent = response.urgent;<BR>
+		<FONT COLOR="#880088">// critical section</FONT><BR>
+		pthread_mutex_lock(&cond-&gt;lock);<BR>
+		send(urgent_Q[office_number], st_info);<BR>
+		cond-&gt;urgent[office_number]++;<BR>
+		pthread_cond_broadcast(cond-&gt;cond);<BR>
+		pthread_mutex_unlock(&cond-&gt;lock);<BR>
+		<FONT COLOR="#880088">// end of critical section</FONT><BR>
+		<FONT COLOR="#880088">// and wait for the final result</FONT><BR>
+		response = receive(answer_Q[i]);<BR>
+		pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"student %d completed at office %d\n"</FONT>, i, office_number);<BR>
+	}<BR>
+	<BR>
+	<FONT COLOR="#880088">// TODO implement a barrier (last student terminates the program)</FONT><BR>
+	<BR>
+	<FONT COLOR="#888800">return</FONT> NULL;<BR>
+}<BR>
+void *officeFunction(void *param) {<BR>
+	<FONT COLOR="#008888">int</FONT> *office_no = (<FONT COLOR="#008888">int</FONT> *)param;<BR>
+	<FONT COLOR="#008888">int</FONT> i = *office_no;<BR>
+	Info info;<BR>
+	pthread_detach(pthread_self());<BR>
+	<FONT COLOR="#888800">while</FONT>(1) {<BR>
+		<FONT COLOR="#888800">while</FONT>(!(cond-&gt;normal || cond-&gt;urgent[*office_no])) {<BR>
+			<FONT COLOR="#880088">//printf("office %d waiting on condition normal = %d, urgent[%d] = %d\n", i, cond->normal, i, cond->urgent[i]);</FONT><BR>
+			pthread_cond_wait(cond-&gt;cond, &cond-&gt;lock);<BR>
+		}<BR>
+		<FONT COLOR="#888800">if</FONT> (cond-&gt;urgent[*office_no]) {<BR>
+			<FONT COLOR="#880088">// receive from urgent</FONT><BR>
+			cond-&gt;urgent[*office_no]--;<BR>
+			info = receive(urgent_Q[*office_no]);<BR>
+			pthread_mutex_unlock(&cond-&gt;lock);<BR>
+		} else {<BR>
+			<FONT COLOR="#880088">// receive from normal queue</FONT><BR>
+			cond-&gt;normal--;<BR>
+			info = receive(normal_Q);<BR>
+			<FONT COLOR="#880088">//printf("received on normal queue\n");</FONT><BR>
+			pthread_mutex_unlock(&cond-&gt;lock);<BR>
+		}<BR>
+		Info receiveMsg, officeAnswer;<BR>
+		<FONT COLOR="#880088">// tell the student that this office received him</FONT><BR>
+		receiveMsg.id = info.id;<BR>
+		receiveMsg.office_no = i;<BR>
+		receiveMsg.urgent = -1;<BR>
+		send(answer_Q[info.id], receiveMsg);<BR>
+		<FONT COLOR="#880088">// time required to serve</FONT><BR>
+		sleep(rand() % 4 + 3);<BR>
+		<FONT COLOR="#880088">// random decision for sending student to special office </FONT><BR>
+		<FONT COLOR="#888800">if</FONT> (rand() % 1000 &gt; 400) {<BR>
+			<FONT COLOR="#880088">// no need for additional informations</FONT><BR>
+			officeAnswer.office_no = i;<BR>
+		} else {<BR>
+			<FONT COLOR="#880088">// need to go to special office</FONT><BR>
+			officeAnswer.office_no = -1;<BR>
+		}<BR>
+		officeAnswer.id = info.id;<BR>
+		officeAnswer.urgent = -1;<BR>
+		<FONT COLOR="#880088">// send the answer to the student</FONT><BR>
+		send(answer_Q[info.id], officeAnswer);<BR>
+	}<BR>
+	<FONT COLOR="#888800">return</FONT> NULL;<BR>
+}<BR>
+<BR>
+void *officeSpecialFunction(void *param) {<BR>
+	Info info, officeAnswer;<BR>
+	pthread_detach(pthread_self());<BR>
+	<FONT COLOR="#888800">while</FONT>(1) {<BR>
+		info = receive(special_Q);<BR>
+		<FONT COLOR="#880088">// time required to serve</FONT><BR>
+		sleep(rand() % 4 + 3);<BR>
+		officeAnswer.id = info.id;<BR>
+		officeAnswer.office_no = info.office_no;<BR>
+		officeAnswer.urgent = 1;<BR>
+		<FONT COLOR="#880088">// send the answer to the student</FONT><BR>
+		send(answer_Q[info.id], officeAnswer);<BR>
+	}<BR>
+	<FONT COLOR="#888800">return</FONT> NULL;<BR>
+}<BR>
+<BR>
+/*<BR>
+pthread_mutex_lock(&cond.lock);<BR>
+<FONT COLOR="#888800">while</FONT>(!conditionMet) {<BR>
+	pr<FONT COLOR="#008888">int</FONT>f(<FONT COLOR="#0000FF">"Thread blocked"</FONT>);<BR>
+	pthread_cond_wait(&cond.cond, &cond.lock);<BR>
+}<BR>
+<BR>
+pthread_mutex_unlock(&cond.lock)<BR>
+*/<BR>
+<BR>
+<BR>
+<FONT COLOR="#880088">// queue functions</FONT><BR>
+<BR>
+<FONT COLOR="#880088">/* Initialize a buffer */</FONT><BR>
+Buffer *B_init (<FONT COLOR="#008888">int</FONT> size) {<BR>
+	Buffer *b;<BR>
+	b = malloc(sizeof(Buffer));<BR>
+	pthread_mutex_init (&b-&gt;lock, NULL);<BR>
+	b-&gt;notempty = malloc(sizeof(pthread_cond_t));<BR>
+	b-&gt;notfull = malloc(sizeof(pthread_cond_t));<BR>
+	pthread_cond_init (b-&gt;notempty, NULL);<BR>
+	pthread_cond_init (b-&gt;notfull, NULL);<BR>
+	b-&gt;out = 0;<BR>
+	b-&gt;in = 0;<BR>
+	b-&gt;count = 0;<BR>
+	b-&gt;dim = size;<BR>
+	b-&gt;buffer = malloc(size * sizeof(Info));<BR>
+	<FONT COLOR="#888800">return</FONT> b;<BR>
+}<BR>
+<BR>
+<FONT COLOR="#880088">/* Store an Info in the buffer */</FONT><BR>
+void send (Buffer *b, Info data) {<BR>
+	pthread_mutex_lock (&b-&gt;lock);<BR>
+	<FONT COLOR="#880088">/* Wait until buffer is not full */</FONT><BR>
+	<FONT COLOR="#888800">while</FONT> (b-&gt;count == b-&gt;dim) {<BR>
+		pthread_cond_wait (b-&gt;notfull, &b-&gt;lock);<BR>
+		<FONT COLOR="#880088">/* pthread_cond_wait reacquired b->lock before returning */</FONT><BR>
+	}<BR>
+	<FONT COLOR="#880088">/* Write the data and advance write pointer */</FONT><BR>
+	b-&gt;buffer[b-&gt;in] = data;<BR>
+	b-&gt;in++;<BR>
+	<FONT COLOR="#888800">if</FONT> (b-&gt;in &gt;= b-&gt;dim)<BR>
+	b-&gt;in = 0;<BR>
+	b-&gt;count++;<BR>
+	<FONT COLOR="#880088">/* Signal that the buffer is now not empty */</FONT><BR>
+	pthread_cond_signal (b-&gt;notempty);<BR>
+	pthread_mutex_unlock (&b-&gt;lock);<BR>
+}<BR>
+<BR>
+<FONT COLOR="#880088">/* Read and remove an Info from the buffer */</FONT><BR>
+Info receive (Buffer *b) {<BR>
+	Info data;<BR>
+	pthread_mutex_lock (&b-&gt;lock);<BR>
+	<FONT COLOR="#880088">/* Wait until buffer is not empty */</FONT><BR>
+	<FONT COLOR="#888800">while</FONT> (b-&gt;count == 0) {<BR>
+		pthread_cond_wait (b-&gt;notempty, &b-&gt;lock);<BR>
+	}<BR>
+	<FONT COLOR="#880088">/* Read the data and advance read pointer */</FONT><BR>
+	data = b-&gt;buffer[b-&gt;out];<BR>
+	b-&gt;out++;<BR>
+	<FONT COLOR="#888800">if</FONT> (b-&gt;out &gt;= b-&gt;dim)<BR>
+	b-&gt;out = 0;<BR>
+	b-&gt;count--;<BR>
+	<FONT COLOR="#880088">/* Signal that the buffer is now not full */</FONT><BR>
+	pthread_cond_signal (b-&gt;notfull);<BR>
+	pthread_mutex_unlock (&b-&gt;lock);<BR>
+	<FONT COLOR="#888800">return</FONT> data;<BR>
+}<BR>
+/*<BR>
+typedef struct Cond{<BR>
+	pthread_mutex_t lock;  <BR>
+	pthread_cond_t  *cond;	<FONT COLOR="#880088">// to be allocated</FONT><BR>
+	<FONT COLOR="#008888">int</FONT>             *urgent;	<FONT COLOR="#880088">// NUM_OFFICES to be allocated</FONT><BR>
+	<FONT COLOR="#008888">int</FONT>             normal;<BR>
+} Cond;<BR>
+*/<BR>
+Cond * cond_init(<FONT COLOR="#008888">int</FONT> n) {<BR>
+	Cond *c;<BR>
+	<FONT COLOR="#008888">int</FONT> i;<BR>
+	c = malloc(sizeof(Cond));<BR>
+	c-&gt;cond = malloc(sizeof(pthread_cond_t));<BR>
+	pthread_mutex_init (&c-&gt;lock, NULL);<BR>
+	pthread_cond_init (c-&gt;cond, NULL);<BR>
+	c-&gt;urgent = malloc(n * sizeof(<FONT COLOR="#008888">int</FONT>));<BR>
+	c-&gt;normal = 0;<BR>
+	<FONT COLOR="#888800">for</FONT>(i = 0; i &lt; n; i++) {<BR>
+		c-&gt;urgent[i] = 0;<BR>
+	}<BR>
+	<FONT COLOR="#888800">return</FONT> c;<BR>
+}<BR>

@@ -1,0 +1,15 @@
+http://www.miosito.it/file.html
+ftp://100.300.9.71/file.zip
+ftp://100.255.9.71/file.zip
+http://altro.sito.com/%7Eutente/index.html#rif33
+nntp://news.sito.ch:8181/data/
+nntp://news.sito.ch:8181/
+nntp://news.sito.ch:8181
+nntp://news.sito.ch:8181/pippo.html
+http://ciao.polito.it:10/skenz/
+http://www.polito.it
+http://www.polito.it/pippo.html
+pippo pluto
+pippo
+pluto
+http://www.polito.it

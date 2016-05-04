@@ -1,0 +1,50 @@
+import java_cup.runtime.*;
+
+
+parser code {:
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1){
+                int line = (((Symbol)info).left)+1;
+                int column = (((Symbol)info).right)+1;
+                System.err.print(" (linea "+line+", colonna "+column+"): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+:};
+
+
+
+// Terminal tokens
+terminal SECT_SEP, NAME, ISBN, COMMA, ARROW, S, C, UINT, LI, LS, AV, BO, SO, LETTER, DATE;
+
+
+// Non terminal tokens
+non terminal file;
+
+non terminal writers_list, writer, books_list, book, collocation, genre;
+
+non terminal users_list, user, loans_list, loan;
+
+
+//////////////////////////////////////
+// Grammar start
+//////////////////////////////////////
+
+start with file;
+
+file ::= writers_list SECT_SEP users_list {: System.out.println("File has been parsed correctly"); :};
+
+writers_list ::= writers_list writer | writer ;
+writer ::= NAME ARROW books_list S ;
+books_list ::= books_list COMMA book | book ;
+book ::= ISBN C NAME C UINT C collocation | ISBN C NAME C UINT C ;
+collocation ::= genre UINT LETTER | genre UINT ;
+genre ::= LI AV | LI SO | LS AV | LS BO | LS SO ;
+
+users_list ::= users_list user | user ;
+user ::= NAME C loans_list S ;
+loans_list ::= loans_list COMMA loan | loan ;
+loan ::= DATE ISBN ;

@@ -1,0 +1,79 @@
+import java_cup.runtime.*;
+
+
+parser code {:
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1){
+                int line = (((Symbol)info).left)+1;
+                int column = (((Symbol)info).right)+1;
+                System.err.print(" (linea "+line+", colonna "+column+"): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+    
+    public int nfacts;
+    public int nrules;
+    public int nint;
+    public int n_errors;
+:};
+
+init with {:
+    nfacts = 0;
+    nrules = 0;
+    nint = 0;
+    n_errors = 0;
+:};
+
+
+
+// Terminal tokens
+terminal ATOM, VARIABLE, DOT, COMMA, RULE_SEP, INT_SYMBOL, RO, RC, ERR;
+
+
+// Non terminal tokens
+non terminal prog;
+
+non terminal element, element_list;
+
+non terminal fact, predicate, rule, predicate_list, interrogation, functor, argument_list, argument;
+
+
+//////////////////////////////////////
+// Grammar start
+//////////////////////////////////////
+
+start with prog;
+
+prog ::= element_list {:
+    if(parser.n_errors > 0) {
+        System.out.println("Detected some errors!");
+    } else if(parser.nfacts == 0) {
+        System.out.println("Must have some facts!");
+    } else if(parser.nint != 1){
+        System.out.println("Must have one interrogation!");
+    } else {
+        System.out.println("prog scanned correctly! " + parser.nfacts + " facts " + parser.nrules + " rules " + parser.nint + " interrogation");
+    }
+:};
+element_list ::= element_list element | element ;
+element ::= fact | rule | interrogation 
+    | error {: System.err.println("error in element "); parser.n_errors++; :}
+    ;
+
+fact ::= predicate DOT {: parser.nfacts++; :}
+    | error DOT {: System.err.println("error in fact"); parser.n_errors++; :}
+    ;
+rule ::= predicate RULE_SEP predicate_list DOT {: parser.nrules++; :}
+    | error RULE_SEP error DOT {: System.err.println("error in rule"); parser.n_errors++; :}
+    ;
+interrogation ::= INT_SYMBOL predicate_list DOT {: parser.nint++; :}
+    | INT_SYMBOL error DOT {: System.err.println("error in interrrogation"); parser.n_errors++; :}
+    ;
+predicate_list ::= predicate_list COMMA predicate | predicate;
+predicate ::= functor argument_list RC | ATOM ;
+functor ::= ATOM RO ;
+argument_list ::= argument_list COMMA argument | argument ;
+argument ::= predicate | VARIABLE ;

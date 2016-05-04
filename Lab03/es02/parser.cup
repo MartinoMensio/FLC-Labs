@@ -1,0 +1,107 @@
+import java_cup.runtime.*;
+
+
+parser code {:
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1){
+                int line = (((Symbol)info).left)+1;
+                int column = (((Symbol)info).right)+1;
+                System.err.print(" (linea "+line+", colonna "+column+"): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+:};
+
+
+
+// Terminal tokens
+terminal INT, DOUBLE, ID;
+terminal PRINT, IF, WHILE,  THEN, ELSE;
+terminal RO, RC, BO, BC, SC, CM, SO, S;
+terminal PLUS, MINUS, STAR, DIV;
+terminal MIN, MAJ, MIN_EQ, EQ_MIN, MAJ_EQ, EQ_MAJ, EQ;
+terminal AND, OR, NOT;
+terminal INT_TYPE, DOUBLE_TYPE;
+terminal SIGNED, UNSIGNED, SHORT, LONG, STATIC, EXTERN;
+
+
+// Non terminal tokens
+non terminal prog;
+
+non terminal declarationList, declaration;
+non terminal instructionList, instruction;
+non terminal type, variableList, variable, immediate, uimmediate, sign;
+non terminal assignment, blockOfInstruction;
+non terminal rvalue, whileConstruct, ifConstruct, boolCondition, boolCondition_l, comparator, expression, exp2, exp3;
+non terminal print;
+
+non terminal otherModifier, lengthModifier, signModifier, signedType, lengthedType, baseType;
+
+precedence nonassoc ELSE;
+
+//////////////////////////////////////
+// Grammar start
+//////////////////////////////////////
+
+start with prog;
+
+prog ::= declarationList instructionList {: System.out.println("Program parsed successfully!"); :};
+
+declarationList ::= declarationList declaration |  ;
+
+declaration ::= type variableList S ;
+
+variableList ::= variableList CM variable | variable ;
+
+variable ::= ID | ID SO INT SC | ID SO variable SC | ID SO SC | STAR variable ;
+
+type ::= otherModifier signedType | signedType ;
+
+signedType ::= signModifier lengthedType | lengthedType;
+
+lengthedType ::= lengthModifier baseType | baseType ;
+
+baseType ::= INT_TYPE | DOUBLE_TYPE ;
+
+signModifier ::= SIGNED | UNSIGNED ;
+
+lengthModifier ::= SHORT | LONG ;
+
+otherModifier ::= EXTERN | STATIC | REGISTER ;
+
+instructionList ::= instructionList instruction | instruction ;
+
+instruction ::= assignment S | whileConstruct | ifConstruct | print;
+
+assignment ::= variable EQ rvalue ;
+
+immediate ::= uimmediate | sign uimmediate ;
+
+sign ::= PLUS | MINUS ;
+
+uimmediate ::= INT | DOUBLE ;
+
+blockOfInstruction ::= BO instructionList BC | instruction ;
+
+whileConstruct ::= WHILE RO boolCondition_l RC blockOfInstruction ;
+
+ifConstruct ::= IF RO boolCondition_l RC blockOfInstruction | IF RO boolCondition_l RC blockOfInstruction ELSE blockOfInstruction ;
+
+boolCondition_l ::= boolCondition_l AND boolCondition | boolCondition_l OR boolCondition | NOT boolCondition | boolCondition ;
+
+boolCondition ::= rvalue comparator rvalue ;
+
+comparator ::= MIN | MAJ | MIN_EQ | MAJ_EQ | EQ EQ | NOT EQ;
+
+rvalue ::= rvalue PLUS expression | rvalue MINUS expression | expression ;
+
+expression ::= expression STAR exp2 | expression DIV exp2 | exp2 ;
+
+exp2 ::= RO rvalue RC | exp3 ;
+
+exp3 ::= variable | immediate | sign variable ;
+
+print ::= PRINT RO rvalue RC S ;
