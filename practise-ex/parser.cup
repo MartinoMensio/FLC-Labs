@@ -1,0 +1,45 @@
+import java_cup.runtime.*;
+
+
+parser code {:
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1){
+                int line = (((Symbol)info).left)+1;
+                int column = (((Symbol)info).right)+1;
+                System.err.print(" (linea "+line+", colonna "+column+"): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+:};
+
+init with {:
+
+:};
+
+
+
+// Terminal tokens
+terminal TOKEN2, EMAIL, TOKEN1;
+
+
+// Non terminal tokens
+non terminal file;
+
+//non terminal a, b, c;
+non terminal l_ab, l_b, l_a, l;
+
+
+//////////////////////////////////////
+// Grammar start
+//////////////////////////////////////
+
+start with file;
+
+file ::= l_ab;
+l_ab ::= l_b TOKEN2 | l_a EMAIL | l_ab TOKEN1 ;
+l_b ::= l EMAIL | l_b TOKEN1 ;
+l_a ::= l TOKEN2 | l_a TOKEN1 ;
+l ::= l TOKEN1 | ;
