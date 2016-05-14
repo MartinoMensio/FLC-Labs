@@ -1,0 +1,134 @@
+
+
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.*;
+
+
+
+
+parser code {:
+
+    // Redefinition of error functions
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1){
+                int line = (((Symbol)info).left)+1;
+                int column = (((Symbol)info).right)+1;
+                System.err.print(" (linea "+line+", colonna "+column+"): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+    
+    public Map<String, Double> scalars;
+    public Map<String, Double[]> vectors;
+:};
+    
+init with {:
+    scalars = new HashMap<>();
+    vectors = new HashMap<>();
+:};
+
+
+
+// Terminal tokens
+terminal String ID_LOW;
+terminal String ID_UPP;
+terminal SC, SO, CM, DOT, S, QM;
+terminal PLUS, MINUS, STAR, DIV, CARET;
+terminal EQ;
+terminal Integer INT;
+terminal Double DOUBLE;
+terminal UMINUS;
+
+// Non terminal tokens
+
+non terminal prog;
+non terminal lines, line;
+non terminal assignment;
+non terminal expression;
+non terminal Double scalar, scalar_variable, scalar_expression;
+non terminal Double[] vector, vector_variable, vector_expression;
+non terminal String scalar_variable_id, vector_variable_id;
+non terminal Double number;
+
+// Precedences and associativities
+// lower precedences
+
+precedence left EQ;
+precedence left MINUS;
+precedence left PLUS;
+precedence nonassoc DOT;
+precedence left DIV;
+precedence left STAR;
+precedence nonassoc CARET;
+precedence left UMINUS;
+// higher precedences
+
+
+//////////////////////////////////////
+// Grammar start
+//////////////////////////////////////
+
+start with prog;
+
+prog ::= lines QM;
+
+lines ::= lines line 
+    | line 
+    ;
+
+line ::= assignment S
+    | expression S 
+    ;
+
+assignment ::= scalar_variable_id:a EQ scalar:b {: System.out.println("Assignment: " + b); parser.scalars.put(a, b); :} 
+    | vector_variable_id:a EQ vector:b {: System.out.println("Assignment: [" + b[0] + ", " + b[1] + "]"); parser.vectors.put(a, b); :}
+    ;
+
+expression ::= scalar_expression:a {: System.out.println("Scalar expression: " + a); :}
+    | vector_expression:a {: System.out.println("Vector expression: [" + a[0] + ", " + a[1] + "]"); :} 
+    ;
+
+scalar ::= scalar_variable:a {: RESULT = a; :}
+    | scalar_expression:a {: RESULT = a; :}
+    | number:a {: RESULT = a; :}
+    ;
+
+vector ::= vector_variable:a {: RESULT = a; :}
+    | vector_expression:a {: RESULT = a; :}
+    | SO scalar:a CM scalar:b SC {: RESULT = new Double[] {a, b}; :}
+    ;
+
+scalar_variable ::= ID_LOW:a {: RESULT = parser.scalars.get(a); :}
+    ;
+
+scalar_variable_id ::= ID_LOW:a {: RESULT = a; :}
+    ;
+
+vector_variable ::= ID_UPP:a {: RESULT = parser.vectors.get(a); :}
+    ;
+
+vector_variable_id ::= ID_UPP:a {: RESULT = a; :}
+    ;
+
+scalar_expression ::= scalar:a CARET scalar:b {: RESULT = new Double(Math.pow(a, b)); :}
+    | vector:a DOT vector:b {: RESULT = a[0] * b[0] + a[1] * b[1]; :}
+    | scalar:a PLUS scalar:b {: RESULT = a + b; :}
+    | scalar:a MINUS scalar:b {: RESULT = a - b; :}
+    | scalar:a DIV scalar:b {: RESULT = a / b; :}
+    | scalar:a STAR scalar:b {: RESULT = a * b; :}
+    | MINUS scalar:a  {: RESULT = -a; :} %prec UMINUS
+    ;
+
+vector_expression ::= vector:a PLUS vector:b {: RESULT = new Double[] {a[0] + b[0], a[1] + b[1]}; :}
+    | vector:a MINUS vector:b {: RESULT = new Double[] {a[0] - b[0], a[1] - b[1]}; :}
+    | scalar:a STAR vector:b {: RESULT = new Double[] {a * b[0], a * b[1]}; :}
+    | vector:a STAR scalar:b {: RESULT = new Double[] {a[0] * b, a[1] * b}; :}
+    | vector:a DIV scalar:b {: RESULT = new Double[] {a[0] / b, a[1] / b}; :}
+    ;
+
+number ::= INT:a {: RESULT = new Double(a); :}
+    | DOUBLE:a {: RESULT = new Double(a); :}
+    ;
