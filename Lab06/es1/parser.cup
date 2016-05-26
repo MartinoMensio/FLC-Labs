@@ -1,5 +1,6 @@
 import java_cup.runtime.*;
 import java.io.*;
+import java.util.*;
 
 
 
@@ -40,8 +41,27 @@ parser code {:
         }else return -1;
     }
 
+    public Object stack(int position) throws Exception {
+        if(position > 0) {
+            throw new Exception("Trying to access stack of the future!");
+        }
+        return (((Symbol)stack.elementAt(tos+position)).value);
+    }
+    
+    public int genLabel() {
+        return ++labelCount;
+    }
+    private int labelCount;
+    
+    public Map<String, String> variables;
+    
+:};
 
-    :};
+
+init with {:
+    variables = new HashMap<>();
+    labelCount = 0;
+:};
 
 
 action code {:
@@ -68,19 +88,22 @@ terminal RO, RC, BO, BC, S, CM, SO, SC;
 terminal PLUS, MINUS, STAR, DIV;
 terminal MIN, MAJ, MIN_EQ, EQ_MIN, MAJ_EQ, EQ_MAJ, EQ;
 terminal AND, OR, NOT;
-terminal INT_TYPE, DOUBLE_TYPE;
+terminal String INT_TYPE, DOUBLE_TYPE;
 terminal UMINUS;
 
 
 // Non terminal tokens
 non terminal prog, stmt_list, stmt, if, while, assignment, print;
-non terminal exp;
+non terminal String exp;
 non terminal mineq, majeq;
 
 non terminal decl_list, decl, var_list, var;
-non terminal type, array;
+non terminal String type;
+non terminal array;
 non terminal if_condition, while_condition;
-non terminal id;
+non terminal String id;
+
+non terminal Integer[] NT0, NT1, NT2;
 
 // Precedences and associativities
 // lower precedences
@@ -91,6 +114,7 @@ precedence left MIN, MAJ, MIN_EQ, EQ_MIN, MAJ_EQ, EQ_MAJ, EQ;
 precedence left PLUS, MINUS;
 precedence left STAR, DIV;
 precedence left UMINUS;
+precedence nonassoc IF;
 // higher precedences
 
 
@@ -101,7 +125,7 @@ precedence left UMINUS;
 start with prog;
 
 
-prog ::= decl_list stmt_list {: if (parser.isCorrect) System.out.println("Program correctly recognized"); :}
+prog ::= decl_list stmt_list {: if (parser.isCorrect) System.err.println("Program correctly recognized"); :}
 ;
 
 
@@ -116,17 +140,16 @@ decl ::= type var_list S
     | type error S {: pSynWarning("Error in declaration"); :}
 ;
 
-type ::= INT_TYPE | DOUBLE_TYPE
+type ::= INT_TYPE {: RESULT = "INT"; :}
+    | DOUBLE_TYPE {: RESULT = "DOUBLE"; :}
 ;
 
-var_list ::= var 
-    | var_list CM var
+var_list ::= var:a {: String type = (String)parser.stack(-1); parser.variables.put((String)a, type); System.out.println(type + " " + a); RESULT = type; :}
+    | var_list:a CM var:b {: parser.variables.put((String)a, (String)b); System.out.println(a + " " + b); RESULT = b; :}
 ;
 
-var ::= ID array
-;
-
-array ::= | array SO INT SC
+var ::= ID:a {: RESULT = a; :}
+    | ID:a SO INT:b SC  {: RESULT = (String)a + "[" + b + "]" ; :}
 ;
 
 
@@ -146,8 +169,8 @@ stmt ::= if | while | assignment | print | BO stmt_list BC
 ;   
 
 // Assignment instruction
-assignment ::= id S
-    | id EQ exp S
+assignment ::= id:a S {: System.out.println("EVAL " + a); :}
+    | id:a EQ exp:b S {: System.out.println("EVAL " + b + "\n" + "ASS " + a); :}
     | id EQ error S {: pSynWarning("Error in expression"); :}
     | error EQ exp S {: pSynWarning("Error in assigment"); :}
 ;
@@ -163,10 +186,21 @@ print ::= PRINT id S
 if ::= IF if_condition stmt ELSE stmt
      | IF if_condition stmt
      | IF if_condition stmt error stmt {: pSynWarning("Error 'else' expected in 'if' instruction"); :}
-
 ;
 
-if_condition ::= RO exp RC
+NT1 ::= {: 
+    RESULT = new Integer[2];
+    RESULT[0] = parser.genLabel(); //L0:
+    RESULT[1] = parser.genLabel(); //L1:
+    System.out.println("EVAL"+parser.stack(0));
+    System.out.println("GOTOF L"+RESULT[0]);
+:};
+
+NT2 ::= {:
+    
+:};
+
+if_condition ::= RO exp:a RC {: System.out.println("EVAL " + a); :}
     | RO error RC {: pSynWarning("Error in 'if' condition"); :}
     | error exp RC {: pSynWarning("Error '(' expected in 'if' instruciton"); :}
     | RO exp error  {: pSynWarning("Error ')' expected in 'if' instruciton"); :}
@@ -174,10 +208,22 @@ if_condition ::= RO exp RC
 
 
 // WHILE instruction
-while ::= WHILE while_condition stmt
+while ::= WHILE while_condition NT0:a stmt {: Integer[] l = a;
+    System.out.println("GOTO L" +l[0]);
+    System.out.print("L" + l[1] + ":");
+    :}
 ;
 
-while_condition ::= RO exp RC
+NT0 ::= {:
+    RESULT = new Integer[2];
+    RESULT[0] = parser.genLabel(); //L0:
+    RESULT[1] = parser.genLabel(); //L1:
+    System.out.print("L"+RESULT[0]+":");
+    System.out.println("EVAL"+parser.stack(0));
+    System.out.println("GOTOF L"+RESULT[1]);
+:};
+
+while_condition ::= RO exp:a RC {: RESULT = a; :}
     | RO error RC {: pSynWarning("Error in 'while' condition"); :}
     | error exp RC {: pSynWarning("Error '(' expected in 'while' instruciton"); :}
     | RO exp error  {: pSynWarning("Error ')' expected in 'while' instruciton"); :}
@@ -187,29 +233,29 @@ while_condition ::= RO exp RC
 // Expressions
 exp ::= 
     /* Logical expressions */
-    exp AND exp
-    | exp OR exp
-    | NOT exp
+    exp:a AND exp:b {: RESULT = a + " " + b + " &"; :}
+    | exp:a OR exp:b {: RESULT = a + " " + b + " |"; :}
+    | NOT exp:a {: RESULT = a + " !"; :}
 
     /* Comparison expressions */
-    | exp EQ EQ exp
-    | exp MIN exp
-    | exp MAJ exp
-    | exp mineq exp
-    | exp majeq exp
+    | exp:a EQ EQ exp:b {: RESULT = a + " " + b + " =="; :}
+    | exp:a MIN exp:b {: RESULT = a + " " + b + " <"; :}
+    | exp:a MAJ exp:b {: RESULT = a + " " + b + " >"; :}
+    | exp:a mineq exp:b {: RESULT = a + " " + b + " <="; :}
+    | exp:a majeq exp:b {: RESULT = a + " " + b + " >)"; :}
 
     /* Arithmetic expression */
-    | exp PLUS exp
-    | exp MINUS exp
-    | exp STAR exp
-    | exp DIV exp
-    | RO exp RC
-    | id
-    | INT
-    | DOUBLE
-    | MINUS INT
-    | MINUS DOUBLE
-    | RO error RC {: pSynWarning("Error in expression"); :}
+    | exp:a PLUS exp:b {: RESULT = a + " " + b + " +"; :}
+    | exp:a MINUS exp:b {: RESULT = a + " " + b + " -"; :}
+    | exp:a STAR exp:b {: RESULT = a + " " + b + " *"; :}
+    | exp:a DIV exp:b {: RESULT = a + " " + b + " /"; :}
+    | RO exp:a RC {: RESULT = a; :}
+    | id:a {: RESULT = a; :}
+    | INT:a {: RESULT = Integer.toString((Integer)a); :}
+    | DOUBLE:a {: RESULT = Double.toString((Double)a); :}
+    | MINUS INT:a {: RESULT = "-" + a; :}
+    | MINUS DOUBLE:a {: RESULT = "-" + a; :}
+    | RO error RC {: pSynWarning("Error in expression"); RESULT = ""; :}
 ;
 
 
@@ -217,8 +263,8 @@ mineq ::= MIN_EQ | EQ_MIN;
 majeq ::= MAJ_EQ | EQ_MAJ;
 
 
-id ::= ID
-      |ID SO INT SC
-      |ID SO ID SC
+id ::= ID:a {: RESULT = (String)a; :}
+      |ID:a SO INT:b SC {: RESULT = a + "[" + b + "]"; :}
+      |ID:a SO ID:b SC {: RESULT = a + "[" + b + "]"; :}
       | error SC {: pSynWarning("Error in vector"); :}
 ;
