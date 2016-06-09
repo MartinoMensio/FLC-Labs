@@ -183,9 +183,9 @@ print ::= PRINT id S
 
 
 // IF instruction
-if ::= IF if_condition stmt ELSE stmt
-     | IF if_condition stmt
-     | IF if_condition stmt error stmt {: pSynWarning("Error 'else' expected in 'if' instruction"); :}
+if ::= IF if_condition NT1:a stmt ELSE NT2:b stmt
+     | IF if_condition NT1:a stmt
+     | IF if_condition NT1:a stmt error stmt {: pSynWarning("Error 'else' expected in 'if' instruction"); :}
 ;
 
 NT1 ::= {: 
@@ -197,7 +197,7 @@ NT1 ::= {:
 :};
 
 NT2 ::= {:
-    
+    // TODO
 :};
 
 if_condition ::= RO exp:a RC {: System.out.println("EVAL " + a); :}
