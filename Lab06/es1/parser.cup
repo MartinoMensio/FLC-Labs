@@ -103,7 +103,8 @@ non terminal array;
 non terminal if_condition, while_condition;
 non terminal String id;
 
-non terminal Integer[] NT0, NT1, NT2;
+non terminal Integer[] NT0;
+non terminal Integer NT1, NT2;
 
 // Precedences and associativities
 // lower precedences
@@ -183,21 +184,21 @@ print ::= PRINT id S
 
 
 // IF instruction
-if ::= IF if_condition NT1:a stmt ELSE NT2:b stmt
-     | IF if_condition NT1:a stmt
+if ::= IF if_condition NT1:a stmt ELSE NT2:b stmt {: System.out.print("L" + b + ":"); :}
+     | IF if_condition NT1:a stmt {: System.out.print("L" + a + ":"); :}
      | IF if_condition NT1:a stmt error stmt {: pSynWarning("Error 'else' expected in 'if' instruction"); :}
 ;
 
 NT1 ::= {: 
-    RESULT = new Integer[2];
-    RESULT[0] = parser.genLabel(); //L0:
-    RESULT[1] = parser.genLabel(); //L1:
-    System.out.println("EVAL"+parser.stack(0));
-    System.out.println("GOTOF L"+RESULT[0]);
+    RESULT = parser.genLabel(); //L0:
+    //System.out.println("EVAL "+parser.stack(0)); // done by if_condition
+    System.out.println("GOTOF L"+RESULT);
 :};
 
 NT2 ::= {:
-    // TODO
+    RESULT = parser.genLabel(); //L1:
+    System.out.println("GOTO L"+RESULT);
+    System.out.println("L" + parser.stack(-2) + ":"); // -2 is NT1
 :};
 
 if_condition ::= RO exp:a RC {: System.out.println("EVAL " + a); :}
@@ -219,7 +220,7 @@ NT0 ::= {:
     RESULT[0] = parser.genLabel(); //L0:
     RESULT[1] = parser.genLabel(); //L1:
     System.out.print("L"+RESULT[0]+":");
-    System.out.println("EVAL"+parser.stack(0));
+    System.out.println("EVAL "+parser.stack(0));
     System.out.println("GOTOF L"+RESULT[1]);
 :};
 
